@@ -105,7 +105,7 @@
                             <invokerPackage>org.delta.handler</invokerPackage>
                             <configOptions>
                                 <sourceFolder>src/main/java/</sourceFolder>
-                                <interfaceOnly>false</interfaceOnly>
+                                <interfaceOnly>true</interfaceOnly>
                                 <useSpringBoot3>true</useSpringBoot3>
                                 <openApiNullable>false</openApiNullable>
                                 <useTags>true</useTags>
@@ -137,47 +137,6 @@
                             <sources>
                                 <source>${project.build.directory}/generated-sources/openapi/src/main/java</source>
                             </sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>1.8</version>
-                <executions>
-                    <execution>
-                        <id>move-and-rename-class</id>
-                        <phase>process-sources</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <target name="debug-replace" description="Debug class renaming">
-                                <!-- Move the generated file to src/main/java -->
-                                <move file="${project.build.directory}/generated-sources/openapi/src/main/java/org/delta/handler/OpenApiGeneratorApplication.java"
-                                      tofile="${project.basedir}/src/main/java/org/delta/handler/${mainClassName}.java"/>
-
-                                <move todir="${project.basedir}/src/main/java/org/delta/handler/controller">
-                                    <fileset
-                                            dir="${project.build.directory}/generated-sources/openapi/src/main/java/org/delta/handler/controller">
-                                        <include name="**/*ApiController.java"/>
-                                    </fileset>
-                                </move>
-                                <!-- Replace the class name inside the file -->
-                                <replaceregexp
-                                        file="${project.basedir}/src/main/java/org/delta/handler/${mainClassName}.java"
-                                        match="public class OpenApiGeneratorApplication"
-                                        replace="public class ${mainClassName}"
-                                        byline="true"/>
-                                <!-- Replace the SpringApplication.run reference -->
-                                <replaceregexp
-                                        file="${project.basedir}/src/main/java/org/delta/handler/${mainClassName}.java"
-                                        match="OpenApiGeneratorApplication.class"
-                                        replace="${mainClassName}.class"
-                                        byline="true"/>
-                            </target>
                         </configuration>
                     </execution>
                 </executions>
