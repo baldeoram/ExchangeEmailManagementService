@@ -1,0 +1,150 @@
+name: Workflow sync between workflow-template repo and this repo
+
+on:
+  schedule:
+    - cron:  "15 * * * *"
+  workflow_dispatch:
+
+env:
+  SOURCE_BRANCH: main
+  SOURCE_REPOSITORY: DC-Suburb/workflow-template
+  CI_COMMIT_AUTHOR: github-actions[bot]
+  CI_COMMIT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+  FEATURE_BRANCH: feature/branch-for-workflow-sync
+
+jobs:
+  repo-sync:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      #actions: write
+    steps:
+      - name: Checkout ${{ env.SOURCE_REPOSITORY }}
+        uses: actions/checkout@v4
+        if: github.repository != env.SOURCE_REPOSITORY
+        with:
+          repository: ${{ env.SOURCE_REPOSITORY }}
+          token: ${{ secrets.REPO_SYNC_PAT }}
+          path: workflow-template
+
+      - name: Checkout ${{ github.repository }}
+        uses: actions/checkout@v4
+        if: github.repository != env.SOURCE_REPOSITORY
+        with:
+          path: default-path
+          #token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.REPO_SYNC_PAT }}
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Set up Git
+        if: github.repository != env.SOURCE_REPOSITORY
+        run: |
+          git config --global user.name "${{ env.CI_COMMIT_AUTHOR }}"
+          git config --global user.email "${{ env.CI_COMMIT_EMAIL }}"
+          git config --global push.autoSetupRemote true
+          
+      - name: Check if feature branch ${{ env.FEATURE_BRANCH }} exists
+        if: github.repository != env.SOURCE_REPOSITORY
+        id: feature-branch
+        run: |
+          echo "Moving inside directory default-path[for ${{ github.repository }} repo]"
+          cd default-path
+          echo "Check if branch ${{ env.FEATURE_BRANCH }} exists!"
+          BRANCH_REF=$(git ls-remote --heads origin ${{ env.FEATURE_BRANCH }})
+          echo "Branch Ref: $BRANCH_REF"
+          
+          if [ -z "$BRANCH_REF" ]
+          then
+            echo "Git branch '${{ env.FEATURE_BRANCH }}' does not exist in the remote repository."
+            echo "BRANCH_REF=false" >> $GITHUB_OUTPUT
+          else
+            echo "Git branch '${{ env.FEATURE_BRANCH }}' exists in the remote repository"
+            echo "BRANCH_REF=true" >> $GITHUB_OUTPUT
+          fi 
+          
+          
+      - name: Create new branch if ${{ env.FEATURE_BRANCH }} does not exist
+        if: steps.feature-branch.outputs.BRANCH_REF == 'false'
+        run: |
+          
+          echo "Moving inside directory default-path[for ${{ github.repository }} repo]"
+          cd default-path
+          pwd
+          echo "List of items in directory default-path"
+          ls -lart
+          
+          echo "Printing git status"
+          git status
+          
+          #git checkout -b ${{ env.FEATURE_BRANCH }} ${{ github.event.repository.default_branch }}
+          git checkout -b ${{ env.FEATURE_BRANCH }}
+          #git push -u origin ${{ env.FEATURE_BRANCH }}
+          
+          #cd ..
+          #rm -rf default-path
+          
+      - name: Checkout ${{ env.FEATURE_BRANCH }} if it exists
+        if: steps.feature-branch.outputs.BRANCH_REF == 'true'
+        uses: actions/checkout@v4
+        with:
+          path: default-path
+          #token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.REPO_SYNC_PAT }}
+          ref: ${{ env.FEATURE_BRANCH }}
+        
+
+      - name: GIT commit and push
+        if: github.repository != env.SOURCE_REPOSITORY
+        env: 
+          CI_COMMIT_MESSAGE: updated workflow templates
+        run: |
+          pwd
+          echo "Listing workflow-template workflow files"
+          ls -lart ./workflow-template/.github/workflows
+          echo "Listing ${{ github.repository }} workflow files"
+          ls -lart ./default-path/.github/workflows
+          cp ./workflow-template/.github/workflows/*.yml ./default-path/.github/workflows
+          
+          echo "Listing ${{ github.repository }} workflow files after copying from workflow-template repo"
+          ls -lart ./default-path/.github/workflows
+          
+          cd default-path
+          
+          echo "checking commit status:"
+          git status
+          
+          NOTHING_TO_COMMIT=NOTHING_TO_COMMIT
+          ANYTHING_TO_COMMIT=$(git status | grep -q "nothing to commit" && echo $NOTHING_TO_COMMIT || echo "items are there to commit")
+          echo "Anything to Commit: $ANYTHING_TO_COMMIT"
+          
+          if [[ $ANYTHING_TO_COMMIT != $NOTHING_TO_COMMIT ]]
+          then
+            git add .github/workflows/*.yml
+            git commit -m "${{ env.CI_COMMIT_MESSAGE }}"
+            git push
+            #git push --set-upstream origin ${{ env.FEATURE_BRANCH }}
+          fi
+          
+          
+      - name: create pull request
+        if: github.repository != env.SOURCE_REPOSITORY
+        run: |
+          ls -lart
+          cd default-path
+          pwd
+          ls -lart
+          
+          echo "PR List:"
+          PR_NUMBER=$(gh pr list -B ${{ github.event.repository.default_branch }} -H ${{ env.FEATURE_BRANCH }} --json number --jq '.[].number')
+          echo "If PR exists, PR Number: $PR_NUMBER"
+          
+          if [ -z "$PR_NUMBER" ]
+          then
+            echo "PR does not exist. Creating PR..."
+            gh pr create -B ${{ github.event.repository.default_branch }} -H ${{ env.FEATURE_BRANCH }} --title '[actions-template-sync] Getting workflow action update from workflow-template repo' --body 'Created by Github action' --assignee Pratkp2022 --label template_sync --reviewer Pratkp2022
+          fi
+                    
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_SYNC_PAT }}

@@ -1,0 +1,159 @@
+openapi: 3.0.3
+info:
+  title: Exchange Email API
+  description: API for managing email subscriptions and stream settings.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:8080/api/v1
+
+tags:
+  - name: Subscription
+    description: Operations related to email subscriptions
+  - name: StreamSetting
+    description: Operations related to email stream settings
+  - name: Webhook
+    description: Webhook endpoints for handling notifications and authentication
+
+paths:
+  /exchange/email/subscription:
+    post:
+      tags:
+        - Subscription
+      summary: Create a new subscription
+      description: Remove from internal database as well as from Exchange Online.
+      operationId: createSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Subscription'
+      responses:
+        '201':
+          description: Subscription created
+    
+    get:
+      tags:
+        - Subscription
+      summary: Retrieve all subscriptions
+      description: Fetch all subscriptions from the database.
+      operationId: getSubscriptions
+      responses:
+        '200':
+          description: A list of subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subscription'
+    
+    delete:
+      tags:
+        - Subscription
+      summary: Remove a subscription
+      description: Remove from internal database as well as from Exchange Online.
+      operationId: deleteSubscription
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Subscription deleted
+
+  /exchange/email/stream/setting:
+    put:
+      tags:
+        - StreamSetting
+      summary: Add/Update stream setting
+      description: Update settings in the database for Apache Storm Sprouts and Bolts involving downloading emails.
+      operationId: updateStreamSetting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreamSetting'
+      responses:
+        '200':
+          description: Stream setting updated
+    
+    get:
+      tags:
+        - StreamSetting
+      summary: Retrieve all stream settings
+      description: Fetch all settings from the database.
+      operationId: getStreamSettings
+      responses:
+        '200':
+          description: A list of stream settings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreamSetting'
+
+  /exchange/email/subscription/lifecycle:
+    post:
+      tags:
+        - Webhook
+      summary: Handle authentication and subscription renewal
+      description: Responding to the incoming webhook from Microsoft server.
+      operationId: handleSubscriptionLifecycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Subscription lifecycle handled
+
+  /exchange/email/subscription/notification:
+    post:
+      tags:
+        - Webhook
+      summary: Handle email notifications from Exchange
+      description: Respond to webhook notifications from Exchange and publish messages to a Kafka topic `email_notification`.
+      operationId: handleSubscriptionNotification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Notification processed
+
+components:
+  schemas:
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+
+    StreamSetting:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        settingKey:
+          type: string
+        settingValue:
+          type: string
